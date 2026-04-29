@@ -6,7 +6,8 @@
 
 import { state } from "../state.js";
 import { cyStyles } from "./styles.js";
-import { populateStartNode, resetTraversal } from "../ui/dom.js";
+import { populateStartNode } from "../ui/dom.js";
+import { resetTraversal } from "../ui/events.js";
 
 /**
  * Crea o recrea la instancia de Cytoscape con los datos del grafo[cite: 4].
