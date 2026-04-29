@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARB · Recorrido en grafos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <strong class="brand-name">ARB</strong>
+        <span class="brand-sep">·</span>
+        <span class="brand-tag">Recorrido en grafos</span>
+      </div>
+
+      <div class="header-controls">
+        <div class="header-group">
+          <span class="header-label">Algoritmo</span>
+          <div class="algo-toggle">
+            <button class="algo-btn active" data-algo="bfs">BFS</button>
+            <button class="algo-btn" data-algo="dfs">DFS</button>
+          </div>
+        </div>
+
+        <div class="header-group">
+          <span class="header-label">Inicio</span>
+          <div class="start-wrap">
+            <select id="start-node" class="start-select"></select>
+          </div>
+        </div>
+
+        <button class="btn-import" id="btn-import">
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true">
+            <path
+              d="M8 1v9m0 0L5 7m3 3 3-3M2 12v2a1 1 0 001 1h10a1 1 0 001-1v-2"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          Importar
+        </button>
+        <input type="file" id="file-input" accept=".json,.csv,.txt" hidden />
+      </div>
+    </header>
+
+    <div class="app">
+      <main class="graph-area">
+        <div class="toolbar" id="toolbar">
+          <button class="tool-btn" id="btn-fit">Ajustar</button>
+          <button class="tool-btn" id="btn-layout">Redistribuir</button>
+          <button class="tool-btn" id="btn-tree">&#9661; Árbol</button>
+        </div>
+
+        <div class="empty-state" id="empty-state">
+          <p>Cargando grafo de ejemplo…</p>
+        </div>
+        <div id="cy"></div>
+        <div class="done-banner" id="done-banner">✓ Recorrido completado</div>
+        <div class="zoom-hint" id="zoom-hint">
+          Ctrl + scroll para hacer zoom
+        </div>
+
+        <div class="legend-overlay">
+          <div class="legend-row">
+            <div class="legend-dot dot-unvisited"></div>
+            No visitado
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot dot-pending"></div>
+            En cola / pila
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot dot-current"></div>
+            Visitando
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot dot-visited"></div>
+            Visitado
+          </div>
+        </div>
+      </main>
+
+      <aside class="panel">
+        <!-- Paso actual -->
+        <section class="panel-section">
+          <span class="panel-label">Paso actual</span>
+          <div class="step-big">
+            <span class="step-big-num" id="step-big-num">—</span>
+            <span class="step-big-den" id="step-big-den">/ —</span>
+          </div>
+          <p class="step-desc" id="step-desc">
+            Configura el algoritmo y pulsa <strong>Iniciar</strong>
+          </p>
+          <div class="progress-bar" id="progress-bar"></div>
+        </section>
+
+        <!-- Controles -->
+        <div class="controls">
+          <button class="btn-primary" id="btn-play">&#9654; Iniciar</button>
+          <button class="btn-icon" id="btn-step" title="Avanzar un paso">
+            &#8594;
+          </button>
+          <button class="btn-icon" id="btn-reset" title="Reiniciar">
+            &#8635;
+          </button>
+        </div>
+
+        <!-- Velocidad -->
+        <section class="panel-section speed-section">
+          <span class="panel-label">Vel</span>
+          <input type="range" id="speed" min="1" max="3" value="2" step="1" />
+          <span class="speed-label" id="speed-label">Med</span>
+        </section>
+
+        <!-- Cola -->
+        <section class="panel-section">
+          <span class="panel-label" id="queue-title">Cola</span>
+          <div class="queue-chips" id="queue-chips">
+            <span class="chip-empty">vacía</span>
+          </div>
+        </section>
+
+        <div class="error-box" id="error-box"></div>
+
+        <!-- Registro -->
+        <section class="panel-section log-section">
+          <span class="panel-label">Registro de visitas</span>
+          <ol class="visit-log" id="visit-log">
+            <li class="log-empty">Aún no se ha iniciado el recorrido.</li>
+          </ol>
+        </section>
+      </aside>
+    </div>
+
+    <!-- Modal: organizar en árbol -->
+    <div class="modal-overlay" id="tree-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Organizar en árbol</h3>
+          <button class="modal-close" id="tree-modal-close">&#x2715;</button>
+        </div>
+        <p class="modal-subtitle">
+          Elige el nodo raíz desde el que se construirá la jerarquía
+        </p>
+        <div class="field">
+          <label>Nodo raíz</label>
+          <select id="tree-root-select"></select>
+        </div>
+        <button class="btn-primary" id="btn-apply-tree" style="width: 100%">
+          Aplicar layout
+        </button>
+      </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
