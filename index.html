@@ -14,6 +14,14 @@
            base-uri 'self';
            form-action 'none';
            object-src 'none'" />
+    <meta
+      name="description"
+      content="Visualizador interactivo de algoritmos BFS y DFS sobre grafos. Herramienta educativa." />
+    <meta property="og:title" content="DRYB · Recorrido en grafos" />
+    <meta
+      property="og:description"
+      content="Visualiza paso a paso cómo funcionan BFS y DFS." />
+    <meta property="og:type" content="website" />
     <title>ARB · Recorrido en grafos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -120,10 +128,18 @@
         <!-- Controles -->
         <div class="controls">
           <button class="btn-primary" id="btn-play">&#9654; Iniciar</button>
-          <button class="btn-icon" id="btn-step" title="Avanzar un paso">
+          <button
+            class="btn-icon"
+            id="btn-step"
+            title="Avanzar un paso"
+            aria-label="Avanzar un paso">
             &#8594;
           </button>
-          <button class="btn-icon" id="btn-reset" title="Reiniciar">
+          <button
+            class="btn-icon"
+            id="btn-reset"
+            title="Reiniciar"
+            aria-label="Reiniciar">
             &#8635;
           </button>
         </div>
@@ -181,5 +197,10 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"></script>
     <script type="module" src="src/main.js"></script>
+    <noscript>
+      <p style="padding: 2rem; text-align: center">
+        Esta aplicación requiere JavaScript habilitado para funcionar.
+      </p> </noscript
+    >n
   </body>
 </html>
