@@ -1,25 +1,16 @@
 /**
+ * src/io/import.js
  * MÓDULO DE IMPORTACIÓN DE GRAFOS
- * =================================
  * Parsea archivos de grafo en tres formatos y los convierte a la
- * estructura estándar interna: { nodes: [...], edges: [...] }
- *
- * Formatos soportados:
- *   .json  — Formato propio o nativo de Cytoscape.js
- *   .csv   — Lista de aristas: source,target[,weight]
- *   .txt   — Lista de adyacencia: "A: B, C" o "A B C"
- *
- * Uso:
- *   parseGraphFile(file)  →  Promise<{ nodes, edges }>
+ * estructura estándar interna: { nodes: [...], edges: [...] }[cite: 1]
  */
 
-// ── ENTRADA PRINCIPAL ─────────────────────────────────────────────────────────
 /**
- * Lee un archivo y lo parsea según su extensión.
+ * Lee un archivo y lo parsea según su extensión[cite: 1].
  * @param {File} file
  * @returns {Promise<{nodes: Array, edges: Array}>}
  */
-function parseGraphFile(file) {
+export function parseGraphFile(file) {
   return new Promise((resolve, reject) => {
     const ext = file.name.split(".").pop().toLowerCase();
     const reader = new FileReader();
@@ -53,19 +44,8 @@ function parseGraphFile(file) {
   });
 }
 
-// ── JSON ──────────────────────────────────────────────────────────────────────
-/**
- * Soporta dos variantes:
- *
- * 1. Formato propio / Generador de Grafos:
- *    { "nodes": [{ "id": "n0", "label": "A" }],
- *      "edges": [{ "id": "e0", "source": "n0", "target": "n1", "weight": 5 }] }
- *
- * 2. Formato nativo Cytoscape.js:
- *    { "elements": { "nodes": [{ "data": {...} }], "edges": [{ "data": {...} }] } }
- *
- * El campo "weight" es opcional en ambos casos.
- */
+// ── FUNCIONES PRIVADAS (No exportadas) ──────────────────────────────────────
+
 function _parseJSON(text) {
   let raw;
   try {
@@ -74,14 +54,13 @@ function _parseJSON(text) {
     throw new Error("El archivo no contiene JSON válido.");
   }
 
-  // Formato nativo Cytoscape
   if (raw.elements) {
     const nodes = (raw.elements.nodes || []).map((el) => ({
       id: el.data.id,
       label: el.data.label || el.data.id,
     }));
-    const edges = (raw.elements.edges || []).map((el) => ({
-      id: el.data.id,
+    const edges = (raw.elements.edges || []).map((el, i) => ({
+      id: el.data.id || `e_${el.data.source}_${el.data.target}_${i}`,
       source: el.data.source,
       target: el.data.target,
       weight: el.data.weight ?? null,
@@ -89,7 +68,6 @@ function _parseJSON(text) {
     return { nodes, edges };
   }
 
-  // Formato propio con arrays directos
   if (Array.isArray(raw.nodes) && Array.isArray(raw.edges)) {
     return {
       nodes: raw.nodes.map((n) => ({ id: n.id, label: n.label || n.id })),
@@ -102,38 +80,81 @@ function _parseJSON(text) {
     };
   }
 
+  if (_looksLikeTreeJSON(raw)) {
+    return _parseTreeJSON(raw);
+  }
+
   throw new Error(
-    'Formato JSON no reconocido. Se esperan campos "nodes" y "edges".',
+    'Formato JSON no reconocido. Se esperan campos "nodes" y "edges", "elements", o estructura de árbol (id/nombre/hijos).',
   );
 }
 
-// ── CSV ───────────────────────────────────────────────────────────────────────
-/**
- * Lista de aristas, una por línea. Separador: coma o punto y coma.
- * La primera línea puede ser cabecera (se detecta automáticamente).
- * El peso es opcional.
- *
- * Ejemplos válidos:
- *
- *   Sin cabecera, sin peso:       Con cabecera y peso:
- *   A,B                           source,target,weight
- *   A,C                           A,B,5
- *   B,D                           A,C,3
- *
- * Los IDs de nodo se generan internamente; el label es el valor de la celda.
- */
+function _looksLikeTreeJSON(raw) {
+  if (Array.isArray(raw)) return raw.some(_isTreeNodeLike);
+  return _isTreeNodeLike(raw);
+}
+
+function _isTreeNodeLike(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return "hijos" in value || "children" in value || "id" in value;
+}
+
+function _parseTreeJSON(raw) {
+  const roots = Array.isArray(raw) ? raw : [raw];
+  const nodes = [];
+  const edges = [];
+  const seenNodeIds = new Set();
+  let autoNodeId = 0;
+  let autoEdgeId = 0;
+
+  function ensureNodeId(node) {
+    let id = node.id != null ? String(node.id) : "";
+    if (!id) id = `n_auto_${autoNodeId++}`;
+
+    if (!seenNodeIds.has(id)) {
+      seenNodeIds.add(id);
+      const label = node.nombre ?? node.label ?? node.name ?? id;
+      nodes.push({ id, label: String(label) });
+    }
+
+    return id;
+  }
+
+  function walk(node, parentId = null) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
+
+    const nodeId = ensureNodeId(node);
+    if (parentId != null) {
+      edges.push({
+        id: `e_tree_${autoEdgeId++}`,
+        source: parentId,
+        target: nodeId,
+        weight: null,
+      });
+    }
+
+    const children = Array.isArray(node.hijos)
+      ? node.hijos
+      : Array.isArray(node.children)
+        ? node.children
+        : [];
+
+    children.forEach((child) => walk(child, nodeId));
+  }
+
+  roots.forEach((root) => walk(root));
+
+  return { nodes, edges };
+}
+
 function _parseCSV(text) {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
-
   if (lines.length === 0) throw new Error("El archivo CSV está vacío.");
 
-  // Detectar separador
   const sep = lines[0].includes(";") ? ";" : ",";
-
-  // Detectar y saltar cabecera
   const firstCols = lines[0].split(sep).map((c) => c.trim().toLowerCase());
   const HEADER_WORDS = [
     "source",
@@ -150,7 +171,7 @@ function _parseCSV(text) {
 
   if (dataLines.length === 0) throw new Error("El CSV no contiene aristas.");
 
-  const nodeMap = new Map(); // label → id
+  const nodeMap = new Map();
   const edges = [];
 
   function getOrCreate(label) {
@@ -175,7 +196,6 @@ function _parseCSV(text) {
       weightStr !== undefined && weightStr !== ""
         ? parseFloat(weightStr)
         : null;
-
     if (weightStr && weightStr !== "" && isNaN(weight))
       throw new Error(
         `Línea ${i + 1 + (hasHeader ? 1 : 0)}: peso inválido "${weightStr}".`,
@@ -196,25 +216,11 @@ function _parseCSV(text) {
   return { nodes, edges };
 }
 
-// ── TXT — LISTA DE ADYACENCIA ─────────────────────────────────────────────────
-/**
- * Cada línea describe un nodo y sus vecinos. Dos estilos detectados automáticamente:
- *
- * Estilo con dos puntos (recomendado):    Estilo solo espacios:
- *   A: B, C, D                              A B C D
- *   B: E, F                                 B E F
- *   C: G                                    C G
- *
- * Líneas que empiezan con "#" se tratan como comentarios y se ignoran.
- * Las aristas duplicadas (A→B implícito en B→A) se eliminan automáticamente.
- * No se soportan pesos en este formato.
- */
 function _parseAdjList(text) {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith("#"));
-
   if (lines.length === 0) throw new Error("El archivo TXT está vacío.");
 
   const colonStyle = lines.some((l) => l.includes(":"));
@@ -253,13 +259,11 @@ function _parseAdjList(text) {
     }
 
     if (!nodeLabel) throw new Error(`Línea ${i + 1}: nombre de nodo vacío.`);
-
     const nodeId = getOrCreate(nodeLabel);
 
     neighborLabels.forEach((nb) => {
       const nbId = getOrCreate(nb);
       if (!nbId) return;
-      // Clave sin dirección para evitar duplicados en grafos no dirigidos
       const key = [nodeId, nbId].sort().join("|");
       if (!edgeSet.has(key)) {
         edgeSet.add(key);
@@ -275,7 +279,6 @@ function _parseAdjList(text) {
 
   if (edges.length === 0)
     throw new Error("No se encontraron aristas en el archivo TXT.");
-
   const nodes = Array.from(nodeMap.entries()).map(([label, id]) => ({
     id,
     label,
@@ -283,14 +286,6 @@ function _parseAdjList(text) {
   return { nodes, edges };
 }
 
-// ── VALIDACIÓN ────────────────────────────────────────────────────────────────
-/**
- * Comprueba que el grafo tiene estructura mínima válida:
- * al menos 2 nodos, al menos 1 arista, y que todas las aristas
- * referencien nodos existentes.
- * @param {Object} data
- * @throws {Error}
- */
 function _validateGraph(data) {
   if (!data.nodes || data.nodes.length < 2)
     throw new Error("El grafo debe tener al menos 2 nodos.");

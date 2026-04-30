@@ -6,6 +6,7 @@
 
 import { state } from "../state.js";
 import { SPEED_MAP, SPEED_NAMES } from "../constants.js";
+import { parseGraphFile } from "../io/import.js";
 import { generateSteps } from "../core/algorithms.js";
 import { applyStep, renderGraph } from "../graph/renderer.js";
 import {
@@ -18,10 +19,6 @@ import {
   clearError,
 } from "./dom.js";
 
-// Importamos la función global expuesta en import.js (asumiendo que sigue siendo un script regular en el HTML)[cite: 2, 4]
-// Si import.js también lo pasas a ES Modules, puedes importarlo directamente aquí:
-// import { parseGraphFile } from '../io/import.js';
-
 // ── Control de Simulación ──
 
 function renderCurrentStep() {
@@ -32,13 +29,23 @@ function renderCurrentStep() {
 
 export function initTraversal() {
   const startId = els.startNodeSel.value;
-  if (!startId || !state.graphData) return;
+  if (!state.graphData) {
+    showError("No hay un grafo cargado para iniciar el recorrido.");
+    return false;
+  }
+  if (!startId) {
+    showError("Selecciona un nodo de inicio para comenzar.");
+    return false;
+  }
+
+  clearError();
   state.steps = generateSteps(state.currentAlgo, startId, state.graphData);
   state.currentStep = 0;
   els.visitLog.innerHTML = "";
   els.doneBanner.style.display = "none";
   renderCurrentStep();
   rebuildLog();
+  return true;
 }
 
 export function resetTraversal() {
@@ -67,8 +74,17 @@ function advance() {
 }
 
 function startPlay() {
-  if (state.currentStep >= state.steps.length - 1) return;
+  if (state.isPlaying || state.playTimer) return;
+
+  // 1. Primero inicializamos si no ha comenzado
   if (state.currentStep < 0) initTraversal();
+
+  if (state.currentStep < 0 || state.steps.length === 0) return;
+
+  // 2. Luego verificamos si ya terminamos
+  if (state.currentStep >= state.steps.length - 1) return;
+
+  // 3. Finalmente, iniciamos el temporizador
   state.isPlaying = true;
   updateButtons();
   const delay = SPEED_MAP[els.speedSlider.value] || 750;
@@ -192,17 +208,14 @@ export function setupEventListeners() {
       if (els.fileInput) els.fileInput.value = "";
       return;
     }
-    // Llama a parseGraphFile (de import.js)
-    if (typeof window.parseGraphFile === "function") {
-      window
-        .parseGraphFile(file)
-        .then((data) => {
-          renderGraph(data); // resetTraversal ya se llama internamente al renderizar
-        })
-        .catch((err) => showError(err.message));
-    } else {
-      showError("El módulo de importación no está cargado.");
-    }
+
+    // Ahora llamamos a la función importada directamente
+    parseGraphFile(file)
+      .then((data) => {
+        renderGraph(data); // resetTraversal ya se llama internamente al renderizar
+      })
+      .catch((err) => showError(err.message));
+
     if (els.fileInput) els.fileInput.value = "";
   };
 

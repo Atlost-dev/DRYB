@@ -24,6 +24,7 @@ Herramienta educativa interactiva para visualizar paso a paso la ejecución de B
 
 - Admite arrastrar y soltar un archivo directamente sobre el canvas o usar el botón "Importar grafo"[cite: 3].
 - Extensiones aceptadas: `.json`, `.csv`, `.txt`[cite: 3]. Cualquier otro tipo se rechaza con un mensaje de error antes de intentar leer el archivo[cite: 3].
+- Guía completa de formatos y ejemplos: [FORMATOS_IMPORTACION.md](FORMATOS_IMPORTACION.md).
 
 ---
 
