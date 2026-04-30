@@ -32,19 +32,19 @@ Herramienta educativa interactiva para visualizar paso a paso la ejecución de B
 
 El proyecto utiliza ES Modules para separar las responsabilidades lógicas, de interfaz y de renderizado:
 
-\`\`\`text
+```
 Algoritmo de Recorrido y Búsqueda/
-├── index.html — Estructura HTML y plantilla de la interfaz principal.
-├── styles.css — Estilos, paleta de colores monocromática y layout[cite: 5].
+├── index.html
+├── styles.css
 └── src/
-├── main.js — Punto de entrada que orquesta el flujo de la aplicación.
-├── state.js — Manejo del estado global de la simulación.
-├── constants.js — Configuraciones y grafo por defecto.
-├── graph/ — Módulos dedicados a la instancia de Cytoscape.js.
-├── core/ — Lógica de algoritmos (BFS/DFS) y utilidades matemáticas.
-├── ui/ — Manipulación del DOM y registro de eventos del usuario.
-└── io/import.js — Parseo y validación de archivos externos[cite: 3].
-\`\`\`
+    ├── main.js
+    ├── state.js
+    ├── constants.js
+    ├── graph/
+    ├── core/
+    ├── ui/
+    └── io/import.js
+```
 
 ---
 
