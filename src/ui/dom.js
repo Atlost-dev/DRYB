@@ -126,16 +126,29 @@ export function rebuildLog() {
   visited.forEach((v, idx) => {
     const li = document.createElement("li");
     if (v.isCurrent) li.classList.add("log-current");
-    const label =
-      v.from && v.from !== v.node
-        ? `${v.node} <span class="log-arrow">&#8592;</span> ${v.from}`
-        : v.node;
-    li.innerHTML = `<span class="log-num">${pad2(idx + 1)}</span><span>${label}</span>`;
+
+    const numSpan = document.createElement("span");
+    numSpan.className = "log-num";
+    numSpan.textContent = pad2(idx + 1);
+
+    const labelSpan = document.createElement("span");
+    if (v.from && v.from !== v.node) {
+      labelSpan.appendChild(document.createTextNode(`${v.node} `));
+
+      const arrowSpan = document.createElement("span");
+      arrowSpan.className = "log-arrow";
+      arrowSpan.textContent = "←";
+      labelSpan.appendChild(arrowSpan);
+
+      labelSpan.appendChild(document.createTextNode(` ${v.from}`));
+    } else {
+      labelSpan.textContent = v.node;
+    }
+
+    li.appendChild(numSpan);
+    li.appendChild(labelSpan);
     els.visitLog.appendChild(li);
   });
-
-  const cur = els.visitLog.querySelector(".log-current");
-  if (cur) cur.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 export function resetUI() {
