@@ -66,6 +66,25 @@ Al cargar la página se muestra un árbol de 9 nodos sin pesos, diseñado para q
 
 ---
 
+## Mejoras Futuras
+
+### UX/Interfaz
+
+- [ ] **Diseño Responsivo:** el layout se adapta a pantallas chicas.
+- [ ] **Caja de Texto para entrada directa:** un `textarea` donde se pueda pegar texto plano y se genere el grafo sin necesidad de crear y subir un archivo.
+- [ ] **Editor Visual:** permitir agregar o eliminar nodos y aristas directamente desde el canvas con clics.
+
+### Funcionalidad
+
+- [ ] **Animación de retroceso en DFS.**
+- [ ] **Velocidad con valor personalizado.**
+
+### Calidad
+
+- [ ] **Favicon.**
+
+---
+
 ## Dependencias
 
 - **Cytoscape.js (v3.29.2)**: Renderización, layouts e interacción del grafo. Cargada vía CDN (`cdnjs.cloudflare.com`). No requiere instalación ni bundler.
