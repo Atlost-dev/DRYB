@@ -149,6 +149,9 @@ export function rebuildLog() {
     li.appendChild(labelSpan);
     els.visitLog.appendChild(li);
   });
+
+  const cur = els.visitLog.querySelector(".log-current");
+  if (cur) cur.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 export function resetUI() {

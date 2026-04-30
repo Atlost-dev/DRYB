@@ -5,6 +5,11 @@
  * estructura estándar interna: { nodes: [...], edges: [...] }[cite: 1]
  */
 
+// Límites defensivos contra archivos maliciosos o accidentalmente enormes.
+const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_NODES = 5000;
+const MAX_EDGES = 20000;
+
 /**
  * Lee un archivo y lo parsea según su extensión[cite: 1].
  * @param {File} file
@@ -12,6 +17,15 @@
  */
 export function parseGraphFile(file) {
   return new Promise((resolve, reject) => {
+    if (file.size > MAX_FILE_BYTES) {
+      reject(
+        new Error(
+          `Archivo demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo permitido: 5 MB.`,
+        ),
+      );
+      return;
+    }
+
     const ext = file.name.split(".").pop().toLowerCase();
     const reader = new FileReader();
 
@@ -46,6 +60,35 @@ export function parseGraphFile(file) {
 
 // ── FUNCIONES PRIVADAS (No exportadas) ──────────────────────────────────────
 
+// IDs reservados que rompen el uso de objetos como diccionarios (ej. en buildAdjacency).
+const FORBIDDEN_IDS = new Set(["__proto__", "constructor", "prototype"]);
+
+function _safeId(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "object") return null;
+  const str = String(value).trim();
+  if (!str) return null;
+  if (FORBIDDEN_IDS.has(str)) {
+    throw new Error(`ID de nodo no permitido: "${str}".`);
+  }
+  return str;
+}
+
+function _safeLabel(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "object") return fallback;
+  return String(value);
+}
+
+function _safeWeight(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    throw new Error(`Peso de arista inválido: "${value}".`);
+  }
+  return n;
+}
+
 function _parseJSON(text) {
   let raw;
   try {
@@ -55,29 +98,45 @@ function _parseJSON(text) {
   }
 
   if (raw.elements) {
-    const nodes = (raw.elements.nodes || []).map((el) => ({
-      id: el.data.id,
-      label: el.data.label || el.data.id,
-    }));
-    const edges = (raw.elements.edges || []).map((el, i) => ({
-      id: el.data.id || `e_${el.data.source}_${el.data.target}_${i}`,
-      source: el.data.source,
-      target: el.data.target,
-      weight: el.data.weight ?? null,
-    }));
+    const nodes = (raw.elements.nodes || []).map((el) => {
+      const id = _safeId(el?.data?.id);
+      if (!id) throw new Error("Nodo sin ID válido en elements.nodes.");
+      return { id, label: _safeLabel(el.data.label, id) };
+    });
+    const edges = (raw.elements.edges || []).map((el, i) => {
+      const source = _safeId(el?.data?.source);
+      const target = _safeId(el?.data?.target);
+      if (!source || !target)
+        throw new Error(`Arista ${i}: source o target inválidos.`);
+      return {
+        id: _safeId(el.data.id) || `e_${source}_${target}_${i}`,
+        source,
+        target,
+        weight: _safeWeight(el.data.weight),
+      };
+    });
     return { nodes, edges };
   }
 
   if (Array.isArray(raw.nodes) && Array.isArray(raw.edges)) {
-    return {
-      nodes: raw.nodes.map((n) => ({ id: n.id, label: n.label || n.id })),
-      edges: raw.edges.map((e) => ({
-        id: e.id || `e_${e.source}_${e.target}`,
-        source: e.source,
-        target: e.target,
-        weight: e.weight ?? null,
-      })),
-    };
+    const nodes = raw.nodes.map((n) => {
+      const id = _safeId(n?.id);
+      if (!id) throw new Error("Nodo sin ID válido en nodes.");
+      return { id, label: _safeLabel(n.label, id) };
+    });
+    const edges = raw.edges.map((e, i) => {
+      const source = _safeId(e?.source);
+      const target = _safeId(e?.target);
+      if (!source || !target)
+        throw new Error(`Arista ${i}: source o target inválidos.`);
+      return {
+        id: _safeId(e.id) || `e_${source}_${target}`,
+        source,
+        target,
+        weight: _safeWeight(e.weight),
+      };
+    });
+    return { nodes, edges };
   }
 
   if (_looksLikeTreeJSON(raw)) {
@@ -108,13 +167,13 @@ function _parseTreeJSON(raw) {
   let autoEdgeId = 0;
 
   function ensureNodeId(node) {
-    let id = node.id != null ? String(node.id) : "";
+    let id = node.id != null ? _safeId(node.id) : null;
     if (!id) id = `n_auto_${autoNodeId++}`;
 
     if (!seenNodeIds.has(id)) {
       seenNodeIds.add(id);
-      const label = node.nombre ?? node.label ?? node.name ?? id;
-      nodes.push({ id, label: String(label) });
+      const rawLabel = node.nombre ?? node.label ?? node.name ?? id;
+      nodes.push({ id, label: _safeLabel(rawLabel, id) });
     }
 
     return id;
@@ -192,14 +251,14 @@ function _parseCSV(text) {
         `Línea ${i + 1 + (hasHeader ? 1 : 0)}: source o target vacíos.`,
       );
 
-    const weight =
-      weightStr !== undefined && weightStr !== ""
-        ? parseFloat(weightStr)
-        : null;
-    if (weightStr && weightStr !== "" && isNaN(weight))
+    let weight;
+    try {
+      weight = _safeWeight(weightStr);
+    } catch {
       throw new Error(
         `Línea ${i + 1 + (hasHeader ? 1 : 0)}: peso inválido "${weightStr}".`,
       );
+    }
 
     edges.push({
       id: `e${i}`,
@@ -292,7 +351,23 @@ function _validateGraph(data) {
   if (!data.edges || data.edges.length < 1)
     throw new Error("El grafo debe tener al menos 1 arista.");
 
-  const ids = new Set(data.nodes.map((n) => n.id));
+  if (data.nodes.length > MAX_NODES)
+    throw new Error(
+      `Demasiados nodos (${data.nodes.length}). Máximo permitido: ${MAX_NODES}.`,
+    );
+  if (data.edges.length > MAX_EDGES)
+    throw new Error(
+      `Demasiadas aristas (${data.edges.length}). Máximo permitido: ${MAX_EDGES}.`,
+    );
+
+  const ids = new Set();
+  for (const n of data.nodes) {
+    if (typeof n.id !== "string" || !n.id)
+      throw new Error("Nodo con ID inválido (no es cadena).");
+    if (ids.has(n.id)) throw new Error(`ID de nodo duplicado: "${n.id}".`);
+    ids.add(n.id);
+  }
+
   for (const e of data.edges) {
     if (!ids.has(e.source))
       throw new Error(`Arista con nodo origen desconocido: "${e.source}"`);
